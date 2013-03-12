@@ -17,6 +17,7 @@ module MiniTest
         puts "Emptying #{@reports_path}"
         FileUtils.remove_dir(@reports_path) if File.exists?(@reports_path)
         FileUtils.mkdir_p(@reports_path)
+        @test_durations = {}
       end
 
       def after_suites(suites, type)
@@ -28,7 +29,7 @@ module MiniTest
           xml.instruct!
           xml.testsuite(:name => suite, :skipped => suite_result[:skip_count], :failures => suite_result[:failure_count], :errors => suite_result[:error_count], :tests => suite_result[:test_count], :assertions => suite_result[:assertion_count]) do
             tests.each do |test, test_runner|
-              xml.testcase(:name => test_runner.test, :classname => suite, :assertions => test_runner.assertions) do
+              xml.testcase(:name => test_runner.test, :classname => suite, :assertions => test_runner.assertions, :time => @test_durations[suite.to_s][test.to_s]) do
                 xml << xml_message_for(test_runner) if test_runner.result != :pass
               end
             end
@@ -36,8 +37,31 @@ module MiniTest
           File.open(filename_for(suite), "w") { |file| file << xml.target! }
         end
       end
+      
+      def pass(suite, test, test_runner)
+        set_test_duration(suite, test)
+      end
+
+      def skip(suite, test, test_runner)
+        set_test_duration(suite, test)
+      end
+
+      def failure(suite, test, test_runner)
+        set_test_duration(suite, test)
+      end
+
+      def error(suite, test, test_runner)
+        set_test_duration(suite, test)
+      end
 
     private
+    
+      def set_test_duration(suite,test)
+        suite = suite.to_s
+        test = test.to_s
+        @test_durations[suite] = {} if @test_durations[suite].nil?
+        @test_durations[suite][test] = Time.now - runner.test_start_time
+      end
 
       def xml_message_for(test_runner)
         # This is a trick lifted from ci_reporter
